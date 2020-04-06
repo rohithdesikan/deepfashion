@@ -1,0 +1,26 @@
+data:
+  all_data: 'datasets'
+  X_train: "datasets/train/image"
+  y_train: "datasets/train/annos"
+  X_val: "datasets/validation/image"
+  y_val: "datasets/validation/annos"
+  X_train_clean: "datasets/processed/X_train.parquet"
+  y_train_clean: "datasets/processed/y_train.parquet"
+  X_val_clean: "datasets/processed/X_val.parquet"
+  y_val_clean: "datasets/processed/y_val.parquet"
+
+# model:
+#   model_name: "random_forest"
+#   model_params: {}
+#   # dir to save model weights
+#   model_path: "model_cache/demo_model.pkl"
+
+# evaluate:
+#   # Flag to retrain the model or not. If False, then the cached model from model->model_dir will be used as model.
+#   retrain: True
+#   # MLFlow experiment name
+#   experiment_name: "demo"
+
+experiments:
+  model_path: "models"
+  predictions_path: "experiments/yhat.parquet"

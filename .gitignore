@@ -1,0 +1,8 @@
+
+**/.vscode
+**/datasets
+**/models/1/
+**/models/yolo.h5
+
+.bash_profile
+.git
