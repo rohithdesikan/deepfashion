@@ -6,7 +6,7 @@ import json
 import time
 import os 
 
-# Import 
+# Import visualization packages
 from PIL import Image, ImageDraw
 import cv2
 import matplotlib.pyplot as plt
@@ -15,22 +15,56 @@ import matplotlib.pyplot as plt
 import torch
 from torch.autograd import Variable
 import torchvision
+from torchvision import transforms, utils
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 # %%
 # Set the file paths
 curr_dir = os.getcwd()
-print(curr_dir)
 path_train = os.path.join(curr_dir,'datasets','train')
 path_val = os.path.join(curr_dir,'datasets','validation')
 path_train_images = os.path.join(path_train, 'image')
 path_train_annos = os.path.join(path_train, 'annos')
 
-# %%
 image_list = os.listdir(path_train_images)
 annos_list = os.listdir(path_train_annos)
 num_images = len(image_list)
+
+# %%
+# Iterate through the image list to find the largest one
+
+def find_largest_image(path_images, image_fns):
+    num_images = len(image_list)
+    sizes = np.zeros((num_images, 2))
+
+    for i, image in enumerate(image_fns):
+
+        # Set up image path and open the single image
+        image_path = os.path.join(path_images, image)
+        image = Image.open(image_path)
+
+        # Output image size to an array
+        sizes[i, 0], sizes[i ,1] = image.size
+
+    return sizes
+
+# %%
+# Run the find largest image function to find largest image
+s = time.time()
+sizes = find_largest_image(path_train_images, image_list)
+print(sizes.max())
+e = time.time()
+print("Time taken to iterate through all images: ", e - s)
+
+# Max Size: Width- 1320, Height- 1835
+# Min Size: Width- 68, Height- 71
+
+
+# %%
+# Iterate through each image and preprocess it by padding and changing the array to suit PyTorch inputs
+
+
 
 # %%
 sizes = np.zeros((num_images, 2))
@@ -123,13 +157,13 @@ plt.imshow(image)
 # load a model pre-trained pre-trained on COCO
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
 
-num_classes = 13  # 13 classes + background
+# num_classes = 13  # 13 classes + background
 
-# get number of input features for the classifier
-in_features = model.roi_heads.box_predictor.cls_score.in_features
+# # get number of input features for the classifier
+# in_features = model.roi_heads.box_predictor.cls_score.in_features
 
-# replace the pre-trained head with a new one
-model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+# # replace the pre-trained head with a new one
+# model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
 # %%
 images, boxes = torch.rand(4, 3, 600, 1200), torch.rand(4, 11, 4)
@@ -142,10 +176,20 @@ for i in range(len(images)):
     d['labels'] = labels[i]
     targets.append(d)
 output = model(images, targets)
+
 # For inference
 model.eval()
 x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
 predictions = model(x)
+
+# %%
+arr2 = np.moveaxis(arr, 2, 0)
+arr3 = np.moveaxis(arr2, 2, 1)
+# arr4 = np.reshape(arr3, (1, 3, 1034, 688))
+arr5 = [torch.from_numpy(arr3)]
+
+model.eval()
+predictions = model(arr5)
 
 # %%
 # Steps to clean and preprocess the images and data

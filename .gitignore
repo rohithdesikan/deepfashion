@@ -1,7 +1,7 @@
 
 **/.vscode
 **/datasets
-**/models/1/
+**/models/faster_rcnn
 **/models/yolo.h5
 
 .bash_profile
