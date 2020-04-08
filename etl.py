@@ -25,8 +25,6 @@ import torchvision
 from torchvision import datasets, models, transforms
 from torch.utils.tensorboard import SummaryWriter
 
-
-
 # %%
 # Read in YAML file
 curr_dir = os.getcwd()

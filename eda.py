@@ -10,11 +10,14 @@ import os
 from PIL import Image, ImageDraw
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from skimage import io, transform
 
 # Import ML libraries
 import torch
 from torch.autograd import Variable
 import torchvision
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -30,6 +33,38 @@ path_train_annos = os.path.join(path_train, 'annos')
 image_list = os.listdir(path_train_images)
 annos_list = os.listdir(path_train_annos)
 num_images = len(image_list)
+
+image_list_small = image_list[:1000]
+annos_list_small = annos_list[:1000]
+num_images_small = len(image_list_small)
+
+# %%
+# Set up a single image to view
+trial_image = '022243'
+
+# Create image path and read in image
+path_image = os.path.join(path_train_images, f'{trial_image}.jpg')
+image = Image.open(path_image)
+width, height = image.size
+arr = np.array(image)
+plt.imshow(image)
+
+# Create annotations path and read it in
+path_annos = os.path.join(path_train_annos, f'{trial_image}.json')
+with open(path_annos,'r') as f:
+    data = json.load(f)
+
+num_items = len([k for k in list(data.keys()) if 'item' in k])
+
+for i in range(1,num_items+1):
+    label = data[f'item{i}']['category_id']
+    x0,y0,x1,y1 = data[f'item{i}']['bounding_box']
+
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([(x0, y0), (x1, y1)], outline='red')
+
+plt.imshow(image)
+
 
 # %%
 # Iterate through the image list to find the largest one
@@ -50,6 +85,20 @@ def find_largest_image(path_images, image_fns):
     return sizes
 
 # %%
+# Use a custom rescale function for both image and bounding box
+def rescale(image, bbox, output_size):
+
+    h, w = image.shape[:2]
+    new_h, new_w = output_size
+
+    trfm = transforms.Resize((new_h, new_w))
+    scaled_image = trfm(image)
+
+    bboxes[0], bboxes[1], bboxes[2], bboxes[3] = x0 * new_w / w, y0 * new_h / h, x1 * new_w / w, y1* new_h / h
+
+    return scaled_image, bboxes
+
+# %%
 # Run the find largest image function to find largest image
 s = time.time()
 sizes = find_largest_image(path_train_images, image_list)
@@ -60,23 +109,21 @@ print("Time taken to iterate through all images: ", e - s)
 # Max Size: Width- 1320, Height- 1835
 # Min Size: Width- 68, Height- 71
 
-
 # %%
-# Iterate through each image and preprocess it by padding and changing the array to suit PyTorch inputs
+# sizes = np.zeros((num_images_small, 2))
+labels = np.zeros((num_images_small, 1))
+bboxes = np.zeros((num_images_small, 4))
 
+target_height, target_width = 600, 1200
+images_arr = np.zeros((num_images_small, 3, target_height, target_width))
 
-
-# %%
-sizes = np.zeros((num_images, 2))
-labels = np.zeros((num_images, 5))
-image_arrs = np.zeros((num_images))
-
-for i, (image, anno) in enumerate(zip(image_list, annos_list)):
+for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
 
     # Output image size to an array
     image = Image.open(image)
-    sizes[i, 0], sizes[i ,1] = image.size
-
+    img_arr = np.array(image)
+    img_arr_c = np.moveaxis(img_arr, 2, 0)
+    img_arr_h = np.moveaxis(img_arr_c, 2, 1)
 
     # Load an image
     with open(anno,'r') as f:
@@ -91,35 +138,9 @@ for i, (image, anno) in enumerate(zip(image_list, annos_list)):
 
         # Get the bounding box and normalize it by the width and height calculated above
         x0_full, y0_full , x1_full , y1_full = data[f'item{obj}']['bounding_box']
-        x0, y0 ,x1, y1 = x0_full/sizes[i,0], y0_full/sizes[i,1] , x1_full/sizes[i,0] , y1_full/sizes[i,1]
 
+            
 
-# %%
-# Set up a single image to view
-trial_image = '022243'
-
-# Create image path and read in image
-path_image = os.path.join(path_train_images, f'{trial_image}.jpg')
-image = Image.open(path_image)
-width, height = image.size
-arr = np.array(image).reshape((width, height, 3))
-plt.imshow(image)
-
-# Create annotations path and read it in
-path_annos = os.path.join(path_train_annos, f'{trial_image}.json')
-with open(path_annos,'r') as f:
-    data = json.load(f)
-
-num_items = len([k for k in list(data.keys()) if 'item' in k])
-
-for i in range(1,num_items+1):
-    label = data[f'item{i}']['category_id']
-    x0,y0,x1,y1 = data[f'item{i}']['bounding_box']
-
-    draw = ImageDraw.Draw(image)
-    draw.rectangle([(x0, y0), (x1, y1)], outline='red')
-
-plt.imshow(image)
 
 # %%
 # Find the maximum number of items aka bounding boxes in a single image
@@ -175,6 +196,8 @@ for i in range(len(images)):
     d['boxes'] = boxes[i]
     d['labels'] = labels[i]
     targets.append(d)
+
+# %%
 output = model(images, targets)
 
 # For inference
@@ -194,22 +217,18 @@ predictions = model(arr5)
 # %%
 # Steps to clean and preprocess the images and data
 
-# Iterate through the images:
-    # Find the largest image by dimensions in the dataset
-
 # Initialize a list of dictionaries for bounding boxes and labels
-# Initialize a numpy array of the largest image size 
-
-# Iterate again over the images and annotations and at every iteration: 
-    # Zero pad all the pixels (with black) on the right and bottom from the maximum size. This way, the bounding box remains the same so that all images are the same size. Whatever size this comes up with, try putting that into the R-CNN model.
 
     # Change axes order from [W, H, C] to [C, H, W] 
 
-    # Collect it into the numpy array
+    # Collect it into the numpy array of standardized size (Call the custom resize function to resize both the image and the associated bounding boxes)
 
     # Collect the label (category_id) and bounding boxes in a list of dictionaries according to: https://github.com/pytorch/vision/blob/master/torchvision/models/detection/faster_rcnn.py
+    
+    # Easier to collect in a list of dictionaries that gets processed at every image as every image can have a variable number of teh 13 detected clothing items
 
+# Build and train the model on only 1000 images. Small enough that it would work quickly. 
 
-# Make an inference on just 1 processed image. 
+# Make an inference on ~100 processed images.
 
 
