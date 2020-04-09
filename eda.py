@@ -34,8 +34,8 @@ image_list = os.listdir(path_train_images)
 annos_list = os.listdir(path_train_annos)
 num_images = len(image_list)
 
-image_list_small = image_list[:1000]
-annos_list_small = annos_list[:1000]
+image_list_small = image_list[:100]
+annos_list_small = annos_list[:100]
 num_images_small = len(image_list_small)
 
 # %%
@@ -85,61 +85,100 @@ def find_largest_image(path_images, image_fns):
     return sizes
 
 # %%
-# Use a custom rescale function for both image and bounding box
-def rescale(image, bbox, output_size):
-
-    h, w = image.shape[:2]
-    new_h, new_w = output_size
-
-    trfm = transforms.Resize((new_h, new_w))
-    scaled_image = trfm(image)
-
-    bboxes[0], bboxes[1], bboxes[2], bboxes[3] = x0 * new_w / w, y0 * new_h / h, x1 * new_w / w, y1* new_h / h
-
-    return scaled_image, bboxes
-
-# %%
 # Run the find largest image function to find largest image
-s = time.time()
-sizes = find_largest_image(path_train_images, image_list)
-print(sizes.max())
-e = time.time()
-print("Time taken to iterate through all images: ", e - s)
+# s = time.time()
+# sizes = find_largest_image(path_train_images, image_list)
+# print(sizes.max())
+# e = time.time()
+# print("Time taken to iterate through all images: ", e - s)
 
 # Max Size: Width- 1320, Height- 1835
 # Min Size: Width- 68, Height- 71
 
 # %%
-# sizes = np.zeros((num_images_small, 2))
-labels = np.zeros((num_images_small, 1))
-bboxes = np.zeros((num_images_small, 4))
+target_height, target_width = 1200, 600
 
-target_height, target_width = 600, 1200
-images_arr = np.zeros((num_images_small, 3, target_height, target_width))
+# %%
+# Rescale images and generate the list of images, targets and bounding boxes
+
+# Initialize an empty list of the length of images and a list of targets which is a list of dictionaries as expected by PyTorch
+images = [None] * len(image_list_small)
+targets = [{}] * len(image_list_small)
 
 for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
 
-    # Output image size to an array
-    image = Image.open(image)
-    img_arr = np.array(image)
-    img_arr_c = np.moveaxis(img_arr, 2, 0)
-    img_arr_h = np.moveaxis(img_arr_c, 2, 1)
+    # Output image size to a numpy array
+    path_image = os.path.join(path_train_images, image)
+    img = Image.open(path_image)
+    image_orig = np.array(img)
 
-    # Load an image
-    with open(anno,'r') as f:
+    # Get the original size of the array
+    h_orig, w_orig = image_orig.shape[:2]
+
+    # Transform the array to a new target size specified above
+    trfm = transforms.Resize((target_height, target_width))
+    image_scaled = trfm(img)
+
+    # Convert the scaled PIl image to a np array
+    image_arr = np.array(image_scaled)
+
+    # Move the numpy axes to the right order as accepted by Pytorch
+    image_channels = np.moveaxis(image_arr, 2, 0)
+    image_ordered = np.moveaxis(image_channels, 2, 1)
+
+
+    # Load the annotations as a json
+    path_anno = os.path.join(path_train_annos, anno)
+    with open(path_anno,'r') as f:
         data = json.load(f)
+    
 
-    # Iterate through each annotation to find the # of labels in the image
-    num_objs = len([k for k in list(data.keys()) if 'item' in k])
+    # Number of targets/labels/bounding boxes and initialize a final targets dictionary for PyTorch input
+    num_targets = len([k for k in list(data.keys()) if 'item' in k])
 
-    # Iterate through each item to find the category id
-    for obj in range(1,num_objs+1):
-        labels[i, 0] = data[f'item{obj}']['category_id']
+    # Initialize 2 lists of labels and bboxes per image. There can obviously be multiple
+    labels_per_image = [None] * num_targets
+    boxes_scaled_per_image = [None] * num_targets
+
+    # Iterate through each annotation to find the # of labels and associated bounding boxes in the image
+    for j in range(1,num_targets+1):
+        
+        # Obtain the image label
+        labels_per_image[j-1] = data[f'item{j}']['category_id']
 
         # Get the bounding box and normalize it by the width and height calculated above
-        x0_full, y0_full , x1_full , y1_full = data[f'item{obj}']['bounding_box']
+        x0, y0, x1, y1 = data[f'item{j}']['bounding_box']
 
-            
+        # Calculate new bounding boxes with the target size
+        x0_new = x0 * target_width / w_orig
+        y0_new = y0 * target_height / h_orig
+        x1_new = x1 * target_width / w_orig
+        y1_new = y1 * target_height / h_orig
+
+        # Put the bounding box information by label into a specific list
+        boxes_scaled_per_image[j-1] = [x0_new, y0_new, x1_new, y1_new]
+    
+
+    # Convert the list of labels into a tensor
+    labels_tensor = torch.IntTensor(labels_per_image)
+
+    # Convert the list of lists of bounding boxes to a torch float tensor
+    boxes_tensor = torch.FloatTensor(boxes_scaled_per_image)
+
+    # Convert the image array to a pytorch tensor
+    image_tensor = torch.from_numpy(image_ordered)
+
+    # print("Iteration # ", i)
+
+    # Put the image tensor into that element of the master list of images
+    images[i] = image_tensor
+
+    # Put the targets as a dictionary into the ith element of the master list of targets which includes labels and bounding boxes
+    target_dict_per_image = {'labels': labels_tensor, 'boxes': boxes_tensor}
+    targets[i] = target_dict_per_image
+
+    # print("Targets: ", targets[i])
+
 
 
 # %%
@@ -178,15 +217,16 @@ for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
 # load a model pre-trained pre-trained on COCO
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
 
-# num_classes = 13  # 13 classes + background
+num_classes = 14  # 13 classes + background
 
-# # get number of input features for the classifier
-# in_features = model.roi_heads.box_predictor.cls_score.in_features
+# get number of input features for the classifier
+in_features = model.roi_heads.box_predictor.cls_score.in_features
 
-# # replace the pre-trained head with a new one
-# model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+# replace the pre-trained head with a new one
+model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
 # %%
+# Generate training data
 images, boxes = torch.rand(4, 3, 600, 1200), torch.rand(4, 11, 4)
 labels = torch.randint(1, 91, (4, 11))
 images = list(image for image in images)
@@ -197,22 +237,24 @@ for i in range(len(images)):
     d['labels'] = labels[i]
     targets.append(d)
 
+# output = model(images, targets)
+
+# %%
+# For inference
+# model.eval()
+# x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+# predictions = model(x)
+
+# %%
+# arr2 = np.moveaxis(arr, 2, 0)
+# arr3 = np.moveaxis(arr2, 2, 1)
+# arr4 = np.reshape(arr3, (1, 3, 1034, 688))
+# arr5 = [torch.from_numpy(arr3)]
+
 # %%
 output = model(images, targets)
-
-# For inference
-model.eval()
-x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
-predictions = model(x)
-
-# %%
-arr2 = np.moveaxis(arr, 2, 0)
-arr3 = np.moveaxis(arr2, 2, 1)
-# arr4 = np.reshape(arr3, (1, 3, 1034, 688))
-arr5 = [torch.from_numpy(arr3)]
-
-model.eval()
-predictions = model(arr5)
+# model.eval()
+# predictions = model(images)
 
 # %%
 # Steps to clean and preprocess the images and data
