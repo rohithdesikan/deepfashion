@@ -3,6 +3,11 @@
 **/datasets
 **/models/faster_rcnn
 **/models/yolo.h5
+**/models/Reproduce_frcnn-master
+**/models/Reproduce_frcnn-master.zip
+**/models/faster_rcnn_resnet101_coco_2018_01_28
+**/models/faster_rcnn_resnet101_coco_2018_01_28.tar.gz
+**/keras-frcnn-master
 
 .bash_profile
 .git

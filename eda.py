@@ -34,8 +34,8 @@ image_list = os.listdir(path_train_images)
 annos_list = os.listdir(path_train_annos)
 num_images = len(image_list)
 
-image_list_small = image_list[:100]
-annos_list_small = annos_list[:100]
+image_list_small = image_list[:5]
+annos_list_small = annos_list[:5]
 num_images_small = len(image_list_small)
 
 # %%
@@ -98,12 +98,13 @@ def find_largest_image(path_images, image_fns):
 # %%
 target_height, target_width = 1200, 600
 
-# %%
 # Rescale images and generate the list of images, targets and bounding boxes
 
 # Initialize an empty list of the length of images and a list of targets which is a list of dictionaries as expected by PyTorch
-images = [None] * len(image_list_small)
-targets = [{}] * len(image_list_small)
+images = []
+labels_tensor = []
+boxes_tensor = []
+# targets = []
 
 for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
 
@@ -125,6 +126,7 @@ for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
     # Move the numpy axes to the right order as accepted by Pytorch
     image_channels = np.moveaxis(image_arr, 2, 0)
     image_ordered = np.moveaxis(image_channels, 2, 1)
+    # image_normalized = image_ordered/255.0
 
 
     # Load the annotations as a json
@@ -137,48 +139,53 @@ for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
     num_targets = len([k for k in list(data.keys()) if 'item' in k])
 
     # Initialize 2 lists of labels and bboxes per image. There can obviously be multiple
-    labels_per_image = [None] * num_targets
-    boxes_scaled_per_image = [None] * num_targets
+    # labels_per_image = [None] * num_targets
+    # boxes_scaled_per_image = [None] * num_targets
 
     # Iterate through each annotation to find the # of labels and associated bounding boxes in the image
     for j in range(1,num_targets+1):
         
         # Obtain the image label
-        labels_per_image[j-1] = data[f'item{j}']['category_id']
+        labels_per_image = data[f'item{j}']['category_id']
 
         # Get the bounding box and normalize it by the width and height calculated above
         x0, y0, x1, y1 = data[f'item{j}']['bounding_box']
 
         # Calculate new bounding boxes with the target size
-        x0_new = x0 * target_width / w_orig
-        y0_new = y0 * target_height / h_orig
-        x1_new = x1 * target_width / w_orig
-        y1_new = y1 * target_height / h_orig
+        x0_scaled = x0 * target_width / w_orig
+        y0_scaled = y0 * target_height / h_orig
+        x1_scaled = x1 * target_width / w_orig
+        y1_scaled = y1 * target_height / h_orig
+
+        # x0_norm = x0_scaled/target_width
+        # y0_norm = y0_scaled/target_height
+        # x1_norm = x1_scaled/target_width
+        # y1_norm = y1_scaled/target_height
 
         # Put the bounding box information by label into a specific list
-        boxes_scaled_per_image[j-1] = [x0_new, y0_new, x1_new, y1_new]
-    
+        boxes_scaled_per_image = [x0_scaled, y0_scaled, x1_scaled, y1_scaled]
 
-    # Convert the list of labels into a tensor
-    labels_tensor = torch.IntTensor(labels_per_image)
+        # Convert the image array to a pytorch tensor
+        image_tensor = torch.from_numpy(image_ordered)
 
-    # Convert the list of lists of bounding boxes to a torch float tensor
-    boxes_tensor = torch.FloatTensor(boxes_scaled_per_image)
+        # Put the image tensor into that element of the master list of images
+        images.append(image_tensor)
 
-    # Convert the image array to a pytorch tensor
-    image_tensor = torch.from_numpy(image_ordered)
+        # Convert the list of labels into a tensor
+        labels_tensor.append(torch.IntTensor([labels_per_image]))
 
-    # print("Iteration # ", i)
-
-    # Put the image tensor into that element of the master list of images
-    images[i] = image_tensor
+        # Convert the list of lists of bounding boxes to a torch float tensor
+        boxes_tensor.append(torch.FloatTensor(boxes_scaled_per_image))
 
     # Put the targets as a dictionary into the ith element of the master list of targets which includes labels and bounding boxes
-    target_dict_per_image = {'labels': labels_tensor, 'boxes': boxes_tensor}
-    targets[i] = target_dict_per_image
 
-    # print("Targets: ", targets[i])
 
+targets = []
+for i in range(len(images)):
+    d = {}
+    d['boxes'] = boxes_tensor[i]
+    d['labels'] = labels_tensor[i]
+    targets.append(d)
 
 
 # %%
@@ -215,27 +222,25 @@ for i, (image, anno) in enumerate(zip(image_list_small, annos_list_small)):
 
 # %%
 # load a model pre-trained pre-trained on COCO
-model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
-
-num_classes = 14  # 13 classes + background
+model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, num_classes=91, progress=True)
 
 # get number of input features for the classifier
 in_features = model.roi_heads.box_predictor.cls_score.in_features
 
 # replace the pre-trained head with a new one
-model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 4)
 
 # %%
 # Generate training data
-images, boxes = torch.rand(4, 3, 600, 1200), torch.rand(4, 11, 4)
-labels = torch.randint(1, 91, (4, 11))
-images = list(image for image in images)
-targets = []
-for i in range(len(images)):
-    d = {}
-    d['boxes'] = boxes[i]
-    d['labels'] = labels[i]
-    targets.append(d)
+# images, boxes = torch.rand(4, 3, 600, 1200), torch.rand(4, 11, 4)
+# labels = torch.randint(1, 91, (4, 11))
+# images = list(image for image in images)
+# targets = []
+# for i in range(len(images)):
+#     d = {}
+#     d['boxes'] = boxes[i]
+#     d['labels'] = labels[i]
+#     targets.append(d)
 
 # output = model(images, targets)
 
@@ -257,20 +262,3 @@ output = model(images, targets)
 # predictions = model(images)
 
 # %%
-# Steps to clean and preprocess the images and data
-
-# Initialize a list of dictionaries for bounding boxes and labels
-
-    # Change axes order from [W, H, C] to [C, H, W] 
-
-    # Collect it into the numpy array of standardized size (Call the custom resize function to resize both the image and the associated bounding boxes)
-
-    # Collect the label (category_id) and bounding boxes in a list of dictionaries according to: https://github.com/pytorch/vision/blob/master/torchvision/models/detection/faster_rcnn.py
-    
-    # Easier to collect in a list of dictionaries that gets processed at every image as every image can have a variable number of teh 13 detected clothing items
-
-# Build and train the model on only 1000 images. Small enough that it would work quickly. 
-
-# Make an inference on ~100 processed images.
-
-

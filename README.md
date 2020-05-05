@@ -7,8 +7,10 @@ As a short description of this dataset, there are 191K training images with 13 d
 ## Dataset:
 https://github.com/switchablenorms/DeepFashion2
 
-All the detailed information about this dataset is here. 
+All the detailed information about this dataset is at this link. 
 
 ## Method
 As an initial method, I am using the Faster R-CNN, which an accurate and fast object detection algorithm. 
+
+Here is the pretrained model repo: https://github.com/kbardool/keras-frcnn
 
