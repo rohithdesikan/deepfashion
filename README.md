@@ -12,5 +12,4 @@ All the detailed information about this dataset is at this link.
 ## Method
 As an initial method, I am using the Faster R-CNN, which an accurate and fast object detection algorithm. 
 
-Here is the pretrained model repo: https://github.com/kbardool/keras-frcnn
-
+I am using a faster RCNN implementation from Tensorflow's Model Zoo: https://github.com/tensorflow/models/tree/master/research/object_detection
