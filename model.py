@@ -23,7 +23,7 @@ import skimage
 import keras
 import tensorflow as tf
 from object_detection.utils import ops as utils_ops
-from object_detection.utils import label_map_util
+from object_detection.utils import label_map_util, dataset_util
 from object_detection.utils import visualization_utils as vis_util
 
 # %%
@@ -44,7 +44,7 @@ annos_list_small = annos_list[:100]
 # %%
 # Set up a single image to view
 #region
-trial_image = '022243'
+trial_image = '033446'
 
 # Create image path and read in image
 path_image = os.path.join(path_train_images, f'{trial_image}.jpg')
@@ -71,7 +71,7 @@ plt.imshow(image)
 #endregion
 
 # %%
-# %%
+
 target_height, target_width = 1200, 600
 
 # Rescale images and generate the list of images, targets and bounding boxes
@@ -131,3 +131,18 @@ data = pd.DataFrame(inputs)
 data.to_csv('train.txt', header=None, index=None, sep = ',')
 
 # %%
+def load_model(model_name):
+    base_url = 'http://download.tensorflow.org/models/object_detection/'
+    model_file = model_name + '.tar.gz'
+    model_dir = tf.keras.utils.get_file(
+        fname=model_name, 
+        origin=base_url + model_file,
+        untar=True)
+
+    model_dir = pathlib.Path(model_dir)/"saved_model"
+
+    model = tf.saved_model.load(str(model_dir))
+    model = model.signatures['serving_default']
+
+    return model
+

@@ -1,6 +1,11 @@
 
 **/.vscode
-**/datasets
+**/datasets/train
+**/datasets/train.zip
+**/datasets/validation.zip
+**/datasets/json_for_validation.zip
+**/datasets/processed_train
+**/datasets/processed_validation
 **/models
 **/keras-frcnn-master
 
