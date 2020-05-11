@@ -4,17 +4,10 @@ import numpy as np
 import os 
 import json
 import time
-import six.moves.urllib as urllib
-import sys
-import tarfile
-import zipfile
-from collections import defaultdict
-from io import StringIO
 from IPython.display import display
 
 # Import visualization packages
 from PIL import Image, ImageDraw
-import cv2
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -26,12 +19,6 @@ import tensorflow as tf
 from object_detection.utils import ops as utils_ops
 from object_detection.utils import label_map_util, dataset_util
 from object_detection.utils import visualization_utils as vis_util
-
-flags = tf.compat.v1.app.flags
-# flags.DEFINE_string('csv_input', '', 'Path to the CSV input')
-# flags.DEFINE_string('image_dir', '', 'Path to the image directory')
-# flags.DEFINE_string('output_path', '', )
-FLAGS = flags.FLAGS
 
 import etl
 
@@ -55,6 +42,9 @@ num_images = len(image_list)
 
 image_list_small = image_list[:100]
 annos_list_small = annos_list[:100]
+
+image_list_eval = image_list[101:130]
+annos_list_eval = annos_list[101:130]
 
 target_height, target_width = 500, 400
 
@@ -93,16 +83,16 @@ etl.resize_images(path_train_images,
                 path_train_annos,
                 path_train_images_processed,
                 path_train_annos_processed,
-                image_list_small,
-                annos_list_small,
+                image_list_eval,
+                annos_list_eval,
                 target_height,
                 target_width)
 
 
 # %%
 # Create a tfrecord of the training set
-writer = tf.compat.v1.python_io.TFRecordWriter('datasets/train.tfrecord')
-for image_fn, anno_fn in zip(image_list_small, annos_list_small):
+writer = tf.compat.v1.python_io.TFRecordWriter('datasets/val.tfrecord')
+for image_fn, anno_fn in zip(image_list_eval, annos_list_eval):
     tf_example = etl.generate_tfrecord(path_train_images_processed, path_train_annos_processed, image_fn, anno_fn)
     writer.write(tf_example.SerializeToString())
 

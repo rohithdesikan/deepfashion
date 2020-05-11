@@ -1,7 +1,6 @@
 # %%
 # Import base packages
 import numpy as np
-# import io
 import os
 import json
 from PIL import Image, ImageDraw
@@ -12,12 +11,6 @@ import tensorflow as tf
 from object_detection.utils import ops as utils_ops
 from object_detection.utils import label_map_util, dataset_util
 from object_detection.utils import visualization_utils as vis_util
-
-flags = tf.compat.v1.app.flags
-# flags.DEFINE_string('csv_input', '', 'Path to the CSV input')
-# flags.DEFINE_string('image_dir', '', 'Path to the image directory')
-# flags.DEFINE_string('output_path', '', 'Path to output TFRecord')
-FLAGS = flags.FLAGS
 
 # %%
 # Resize images and output to a processed folder
