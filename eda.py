@@ -1,28 +1,18 @@
 #%%
 # Import base packages
 import numpy as np
-import pandas as pd
 import json
 import time
-import os 
+import os
 
 # Import visualization packages
 from PIL import Image, ImageDraw
 import cv2
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from skimage import io, transform
 
-# Import ML libraries
-import torch
-from torch.autograd import Variable
-import torchvision
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-
+import skimage
 # %%
+# Set the file paths
 # Set the file paths
 curr_dir = os.getcwd()
 path_train = os.path.join(curr_dir,'datasets','train')
@@ -34,9 +24,8 @@ image_list = os.listdir(path_train_images)
 annos_list = os.listdir(path_train_annos)
 num_images = len(image_list)
 
-image_list_small = image_list[:5]
-annos_list_small = annos_list[:5]
-num_images_small = len(image_list_small)
+image_list_small = image_list[:100]
+annos_list_small = annos_list[:100]
 
 # %%
 # Set up a single image to view
@@ -65,6 +54,28 @@ for i in range(1,num_items+1):
 
 plt.imshow(image)
 
+# %%
+# Check avg height/width ratio for all the images to find approx resizing 
+s = time.time()
+height, width, ratio = [], [], []
+for im in image_list:
+    path_image = os.path.join(path_train_images, im)
+    img = Image.open(path_image)
+    image_orig = np.array(img)
+
+    # Get the original size of the array
+    h_orig, w_orig = image_orig.shape[:2]
+    height.append(h_orig)
+    width.append(w_orig)
+    ratio.append(round(h_orig/w_orig,2)) 
+
+heights = np.array(height)
+widths = np.array(width)
+ratios = np.array(ratio)
+
+e = time.time()
+
+print(e-s)
 
 # %%
 # Iterate through the image list to find the largest one

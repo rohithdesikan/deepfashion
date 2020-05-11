@@ -1,13 +1,17 @@
-
 **/.vscode
+
 **/datasets/train
 **/datasets/train.zip
 **/datasets/validation.zip
 **/datasets/json_for_validation.zip
 **/datasets/processed_train
 **/datasets/processed_validation
+
+**/__pycache__
+
+**/info
+
 **/models
-**/keras-frcnn-master
 
 .bash_profile
 .git
