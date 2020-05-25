@@ -4,7 +4,6 @@ import numpy as np
 import json
 import os
 import datetime
-
 from PIL import Image, ImageDraw
 
 # Import PyTorch packages
@@ -14,7 +13,11 @@ import torchvision
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
-from deepfashion.features import CustomData, collate_fn
+# Import AWS training package
+import sagemaker
+
+# Import local packages
+from utils import CustomData, collate_fn
 
 print("Torch Version: ", torch.__version__, "TorchVision Version: ", torchvision.__version__)
 # %%
