@@ -6,99 +6,45 @@ import os
 import datetime
 from PIL import Image, ImageDraw
 
-# Import PyTorch packages
-import torch
-from torch.utils.data import Dataset
-import torchvision
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-
 # Import AWS training package
 import sagemaker
+from sagemaker.pytorch import PyTorch
 
-# Import local packages
-from utils import CustomData, collate_fn
-
-print("Torch Version: ", torch.__version__, "TorchVision Version: ", torchvision.__version__)
 # %%
 # Set the file paths
 curr_dir = os.getcwd()
+path_sample = os.path.join(curr_dir, 'deepfashion', 'data', 'sample_data')
 
-path_train = os.path.join(curr_dir,'datasets','train')
-path_val = os.path.join(curr_dir,'datasets','validation')
-# path_train_images = os.path.join(path_train, 'image')
-# path_train_annos = os.path.join(path_train, 'annos')
+# Set up sagemaker session
+sagemaker_session = sagemaker.Session(default_bucket = 'rohithdesikan-deepfashion')
 
-# image_list = os.listdir(path_train_images)
-# annos_list = os.listdir(path_train_annos)
-# num_images = len(image_list)
+# Get default bucket
+# bucket = sagemaker_session.default_bucket()
+# print(bucket)
 
-# image_list_small = image_list[:100]
-# annos_list_small = annos_list[:100]
+# Get role
+role = sagemaker.get_execution_role()
+print(role)
 
-# image_list_eval = image_list[101:130]
-# annos_list_eval = annos_list[101:130]
+# set prefix, a descriptive name for a directory
+# prefix = 'deepfashion_sample'
 
-path_train_processed = os.path.join(curr_dir,'datasets','processed_train')
-path_val_processed = os.path.join(curr_dir,'datasets','processed_validation')
-path_train_images_processed = os.path.join(path_train_processed, 'image')
-path_train_annos_processed = os.path.join(path_train_processed, 'annos')
-image_list_processed = os.listdir(path_train_images_processed)
+# upload all data to S3
+# bucket_data = sagemaker_session.upload_data(path_sample, bucket=bucket, key_prefix=prefix)
+bucket_data = 's3://rohithdesikan-deepfashion/deepfashion_sample'
+print(bucket_data)
+# %%
 
-file_ids = [im.split('.')[0] for im in image_list_processed]
-
-# target_height, target_width = 500, 400
+estimator = PyTorch(entry_point='deepfashion.py',
+                    role=role,
+                    framework_version='1.2.0',
+                    train_instance_count=2,
+                    train_instance_type='ml.m4.xlarge',
+                    hyperparameters={
+                        'epochs': 10,
+                    })
 
 # %%
-# Load the dataset and the data loader
-dataset = CustomData(path_train_images_processed, path_train_annos_processed, file_ids)
-
-data_loader = torch.utils.data.DataLoader(dataset, batch_size=20, shuffle=True, num_workers = 6, collate_fn = collate_fn)
-
-# batch_images, batch_annos = next(iter(data_loader))
-# batch_list_images = list(batch_images)
-# batch_list_annos = list(batch_annos)
-
-# print(len(batch_list_images), type(batch_list_images), batch_list_images[0].shape, batch_list_images[0])
-# print(len(batch_list_annos), type(batch_list_annos), batch_list_annos[0])
+estimator.fit({'training': bucket_data})
 
 # %%
-# Set device
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
-# %%
-# Load the model
-model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
-in_features = model.roi_heads.box_predictor.cls_score.in_features
-model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 14)
-params = [p for p in model.parameters() if p.requires_grad]
-optimizer = torch.optim.Adam(params, lr = 0.001)
-model.to(device)
-
-# %%
-# Training
-num_epochs = 10
-for epoch in range(1, num_epochs):
-    print("Epoch: ", epoch)
-
-    model.train()
-
-    i = 0
-    for batch_images, batch_annos in data_loader:
-        i += 1
-        images = list(batch_images.to(device))
-        annos = list(batch_annos.to(device))
-
-
-        loss_dict = model(images, annos)
-        losses = sum(loss for loss in loss_dict.values())
-
-        model.zero_grad()
-        losses.backward()
-        optimizer.step()
-
-        print("Iteration #:  ", i/20, "Loss: ", losses)
-
-# %%
-# Save model:
-torch.save(model.state_dict(), f"experiments/model_{datetime.datetime.now().strftime('%D')}.pt")
