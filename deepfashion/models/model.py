@@ -18,9 +18,9 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import torch.optim as optim
 
 # Import AWS packages
-import sagemaker
-import sagemaker_containers
-import boto3
+# import sagemaker
+# import sagemaker_containers
+# import boto3
 # from boto3.s3.connection import S3Connection
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,9 @@ class TransformData(Dataset):
     def __init__(self, image_path, annos_path, filenames, resize=None):
         self.image_path = image_path
         self.annos_path = annos_path
+    def __init__(self, image_path, targets_path, filenames, resize=None):
+        self.image_path = image_path
+        self.targets_path = targets_path
         self.filenames = filenames
 
         if resize is not None:
@@ -52,6 +55,7 @@ class TransformData(Dataset):
         image_ordered = np.transpose(image_orig, (2, 0, 1))
         image_preprocessed = image_ordered/255.0
         if image.resize:
+        if resize:
             tfrm = transforms.Resize((self.h, self.w))
             image_preprocessed = tfrm(image_preprocessed)
 
@@ -60,6 +64,8 @@ class TransformData(Dataset):
         # Load the annotations as a json
         annos_id = self.filenames[index] + '.json'
         path_anno = os.path.join(self.annos_path, annos_id)
+        targets_id = self.filenames[index] + '.json'
+        path_anno = os.path.join(self.targets_path, targets_id)
         with open(path_anno,'r') as f:
             data = json.load(f)
 
@@ -68,6 +74,7 @@ class TransformData(Dataset):
 
         labels = [None] * num_targets
         boxes = [None] * num_targets
+
         # Iterate through each annotation to find the # of labels and associated bounding boxes in the image
         for j in range(1,num_targets+1):
             
@@ -111,6 +118,7 @@ class FasterRCNN(nn.Module):
         in_features = frcnn_model.roi_heads.box_predictor.cls_score.in_features
         frcnn_model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 14)
         for param in resnet.parameters():
+        for param in frcnn_model.parameters():
             param.requires_grad_(True)
 
         modules = list(frcnn_model.children())
@@ -137,6 +145,17 @@ def _get_train_data_loader(bucket_name, prefix_name, train_batch_size, resize):
 
     # Load the dataset, pass it through the preprocessing steps from the utils file and load the data loader
     dataset = TransformData(path_images, path_annos, file_ids, resize=resize)
+def _get_train_data_loader(bucket_name, train_batch_size, resize):
+    logger.info("Get train data loader")
+
+    # conn = S3Connection()
+    # bucket = conn.get_bucket(bucket_name)
+    path_images = f"s3://{bucket_name}//image"
+    path_targets = f"s3://{bucket_name}//targets"
+    file_ids = [file_id.split('.')[0] for file_id in path_images.list()[:100]]
+
+    # Load the dataset, pass it through the preprocessing steps from the utils file and load the data loader
+    dataset = TransformData(path_images, path_targets, file_ids, resize=resize)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=train_batch_size, shuffle=True, collate_fn = collate_fn)
 
     return data_loader
@@ -154,6 +173,17 @@ def _get_test_data_loader(bucket_name, prefix_name, test_batch_size, resize):
 
     # Load the dataset, pass it through the preprocessing steps from the utils file and load the data loader
     dataset = TransformData(path_images, path_annos, file_ids, resize=resize)
+def _get_test_data_loader(bucket_name, test_batch_size, resize):
+    logger.info("Get test data loader")
+
+    # conn = S3Connection()
+    # bucket = conn.get_bucket(bucket_name)
+    path_images = f"s3://{bucket_name}//image"
+    path_targets = f"s3://{bucket_name}//targets"
+    file_ids = [file_id.split('.')[0] for file_id in path_images.list()[100:]]
+
+    # Load the dataset, pass it through the preprocessing steps from the utils file and load the data loader
+    dataset = TransformData(path_images, path_targets, file_ids, resize=resize)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size = test_batch_size, shuffle = True, collate_fn = collate_fn)
 
     return data_loader
@@ -189,6 +219,11 @@ def train(args):
 
     train_loader = _get_train_data_loader(bucket_name, prefix_name, batch_size)
     test_loader = _get_test_data_loader(bucket_name, prefix_name, batch_size)
+    if device.type == 'cuda':
+        torch.cuda.manual_seed(args.seed)
+
+    train_loader = _get_train_data_loader(args.bucket_name, args.batch_size, args.resize)
+    test_loader = _get_test_data_loader(args.bucket_name, args.batch_size, args.resize)
 
     logger.debug("Processes {}/{} ({:.0f}%) of train data".format(
         len(train_loader.sampler), len(train_loader.dataset),
@@ -218,6 +253,15 @@ def train(args):
 
             losses.backward()
 
+        for batch_idx, (batch_images, batch_targets) in enumerate(train_loader, 1):
+
+            images, targets = list(batch_images.to(device)), list(batch_targets.to(device))
+
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
+
+            model.zero_grad()
+            losses.backward()
             optimizer.step()
 
 
@@ -241,6 +285,12 @@ def test(model, test_loader):
             # test_loss += F.nll_loss(output, annos, size_average=False).item()  # sum up batch loss
     #         pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
     #         correct += pred.eq(annos.view_as(pred)).sum().item()
+        for images, targets in test_loader:
+            images, targets = images.to(device), targets.to(device)
+            output = model(images)
+            # test_loss += F.nll_loss(output, targets, size_average=False).item()  # sum up batch loss
+    #         pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
+    #         correct += pred.eq(targets.view_as(pred)).sum().item()
 
     # test_loss /= len(test_loader.dataset)
     # logger.info('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
@@ -269,6 +319,13 @@ if __name__ == '__main__':
                         help='how many batches to wait before logging training status')
     parser.add_argument('--backend', type=str, default=None,
                         help='backend for distributed training (tcp, gloo on cpu and gloo, nccl on gpu)')
+    parser.add_argument('--fn', type=str, default='20200529_model_v1',
+                        help='model name for saved model')
+    parser.add_argument('--bucket-name', type=str, default='s3://rohithdesikan-deepfashion/deepfashion_sample',
+                        help='this is actual bucket name')
+    parser.add_argument('--model-dir', type=str, default='s3://rohithdesikan-deepfashion/deepfashion_sample/output',
+                        help='this is the where the output of the model should be stored')
+
 
     # Container environment
     # parser.add_argument('--hosts', type=list, default=json.loads(os.environ['SM_HOSTS']))
