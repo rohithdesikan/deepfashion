@@ -18,9 +18,9 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import torch.optim as optim
 
 # Import AWS packages
-# import sagemaker
+import sagemaker
 # import sagemaker_containers
-# import boto3
+import boto3
 # from boto3.s3.connection import S3Connection
 
 logger = logging.getLogger(__name__)
@@ -54,8 +54,7 @@ class TransformData(Dataset):
         # Move the numpy axes to the right order as accepted by Pytorch
         image_ordered = np.transpose(image_orig, (2, 0, 1))
         image_preprocessed = image_ordered/255.0
-        if image.resize:
-        if resize:
+        if self.resize:
             tfrm = transforms.Resize((self.h, self.w))
             image_preprocessed = tfrm(image_preprocessed)
 

@@ -7,6 +7,7 @@ import datetime
 from PIL import Image, ImageDraw
 
 # Import AWS training package
+import boto3
 import sagemaker
 from sagemaker.pytorch import PyTorch
 
