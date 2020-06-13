@@ -30,9 +30,6 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 # Transform the incoming images by normalizing and re ordering and gather the labels and bounding boxes from the annotations
 class TransformData(Dataset):
-    def __init__(self, image_path, annos_path, filenames, resize=None):
-        self.image_path = image_path
-        self.annos_path = annos_path
     def __init__(self, image_path, targets_path, filenames, resize=None):
         self.image_path = image_path
         self.targets_path = targets_path
@@ -44,7 +41,6 @@ class TransformData(Dataset):
     
 
     def __getitem__(self, index):
-
         # Get the image path and open the indexed image
         image_id = self.filenames[index] + '.jpg'
         path_image = os.path.join(self.image_path, image_id)

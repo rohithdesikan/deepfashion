@@ -1,3 +1,4 @@
+# %%
 # Import base packages
 import numpy as np
 import json
@@ -10,9 +11,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 import torchvision
-# from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
+# %%
+
+
+# %%
 class CustomData(Dataset):
     def __init__(self, image_path, annos_path, filenames):
         self.image_path = image_path

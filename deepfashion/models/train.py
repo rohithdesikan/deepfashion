@@ -38,6 +38,7 @@ prefix = 'deepfashion_sample'
 bucket_name = 's3://rohithdesikan-deepfashion/deepfashion_sample'
 print(bucket_name)
 
+Image.open('s3://rohithdesikan-deepfashion/deepfashion_sample/image/000001.jpg')
 
 # %%
 
@@ -45,7 +46,7 @@ estimator = PyTorch(entry_point='model.py',
                     role=role,
                     framework_version='1.2.0',
                     train_instance_count=2,
-                    train_instance_type='ml.m4.xlarge',
+                    train_instance_type='ml.p2.xlarge',
                     output_path='s3://rohithdesikan-deepfashion/deepfashion_sample/output',
                     hyperparameters={
                         'epochs': 5,
