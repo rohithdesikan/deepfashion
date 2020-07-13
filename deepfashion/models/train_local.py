@@ -9,16 +9,19 @@ from PIL import Image, ImageDraw
 # Import PyTorch packages
 import torch
 from torch.utils.data import Dataset
+import torch.nn as nn
 import torchvision
+from torchvision import datasets, transforms
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+import torch.optim as optim
 
 # Import AWS training package
 import sagemaker
 
 # Import local packages
 from model import TransformData, collate_fn
-from model import TransformData, collate_fn, FasterRCNN
+# from model import TransformData, collate_fn, FasterRCNN
 
 print("Torch Version: ", torch.__version__, "TorchVision Version: ", torchvision.__version__)
 
@@ -26,63 +29,30 @@ print("Torch Version: ", torch.__version__, "TorchVision Version: ", torchvision
 # %%
 # Set the file paths
 curr_dir = os.getcwd()
-path_sample = os.path.abspath(os.path.join(curr_dir, os.pardir, 'data', 'sample_data'))
-path_raw = os.path.abspath(os.path.join(curr_dir, os.pardir, os.pardir, 'data', 'raw'))
+path_raw = os.path.abspath(os.path.join(curr_dir, os.pardir, os.pardir, 'data', 'processed'))
 
-path_train = os.path.join(path_raw, 'train')
-path_val = os.path.join(path_raw, 'validation')
-path_train_images = os.path.join(path_train, 'image')
-path_train_annos = os.path.join(path_train, 'annos')
-path_val_images = os.path.join(path_val, 'image')
-path_val_annos = os.path.join(path_val, 'annos')
-path_sample_images = os.path.join(path_sample, 'image')
-path_sample_annos = os.path.join(path_sample, 'annos')
+local_path_train = os.path.join(path_raw, 'train')
+local_path_val = os.path.join(path_raw, 'validation')
+local_path_train_images = os.path.join(local_path_train, 'image')
+local_path_train_targets = os.path.join(local_path_train, 'annos')
+local_path_val_images = os.path.join(local_path_val, 'image')
+local_path_val_targets = os.path.join(local_path_val, 'annos')
 
-train_image_list = os.listdir(path_train_images)
-train_annos_list = os.listdir(path_train_annos)
+train_image_list = os.listdir(local_path_train_images)
+train_targets_list = os.listdir(local_path_train_targets)
+val_image_list = os.listdir(local_path_val_images)
+val_targets_list = os.listdir(local_path_val_targets)
 
-image_list_small = path_sample_images[:100]
-annos_list_small = path_sample_annos[:100]
-
-image_list_eval = path_sample_images[101:130]
-annos_list_eval = path_sample_annos[101:130]
-
-file_ids = [i.split('.')[0] for i in image_list_small]
-path_train_targets = os.path.join(path_train, 'targets')
-path_val_images = os.path.join(path_val, 'image')
-path_val_targets = os.path.join(path_val, 'targets')
-path_sample_images = os.path.join(path_sample, 'image')
-path_sample_targets = os.path.join(path_sample, 'targets')
-
-image_list_sample = os.listdir(path_sample_images)
-targets_list_sample = os.listdir(path_sample_targets)
-
-image_list_train = image_list_sample[:100]
-targets_list_train = targets_list_sample[:100]
-
-image_list_eval = path_sample_images[101:130]
-targets_list_eval = path_sample_targets[101:130]
-
-file_ids_train = [i.split('.')[0] for i in image_list_train]
-file_ids_eval = [i.split('.')[0] for i in image_list_eval]
+file_ids_train = [i.split('.')[0] for i in train_image_list]
+file_ids_val = [i.split('.')[0] for i in val_image_list]
 
 # target_height, target_width = 500, 400
 
 # %%
 # Load the dataset and the data loader
-dataset = TransformData(path_sample_images, path_sample_annos, file_ids)
+dataset = TransformData(local_path_train_images, local_path_train_targets, file_ids_train)
 
-data_loader = torch.utils.data.DataLoader(dataset, batch_size=20, shuffle=True, num_workers = 6, collate_fn = collate_fn)
-
-# batch_images, batch_annos = next(iter(data_loader))
-# batch_list_images = list(batch_images)
-# batch_list_annos = list(batch_annos)
-
-# print(len(batch_list_images), type(batch_list_images), batch_list_images[0].shape, batch_list_images[0])
-# print(len(batch_list_annos), type(batch_list_annos), batch_list_annos[0])
-dataset = TransformData(path_sample_images, path_sample_targets, file_ids_train)
-
-data_loader = torch.utils.data.DataLoader(dataset, batch_size=20, shuffle=True, num_workers = 6, collate_fn = collate_fn)
+data_loader = torch.utils.data.DataLoader(dataset, batch_size=10, shuffle=True, num_workers = 6, collate_fn = collate_fn)
 
 batch_images, batch_targets = next(iter(data_loader))
 batch_list_images = list(batch_images)
@@ -97,12 +67,29 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 # %%
 # Load the model
-model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
 in_features = model.roi_heads.box_predictor.cls_score.in_features
 model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 14)
+
+model.to(device)
 params = [p for p in model.parameters() if p.requires_grad]
 optimizer = torch.optim.Adam(params, lr = 0.001)
-model.to(device)
+
+# %%
+# Set up the Pytorch model in a FasterRCNN class and set all parameters to be trainable
+class FasterRCNN(nn.Module):
+    def __init__(self):
+        super(FasterRCNN, self).__init__()
+        self.frcnn_model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
+        in_features = self.frcnn_model.roi_heads.box_predictor.cls_score.in_features
+        self.frcnn_model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 14)
+
+    def forward(self, images, targets):
+        x = self.frcnn_model(images, targets)
+
+        return x
+
+# %%
 model = FasterRCNN()
 model.to(device)
 params = [p for p in model.parameters() if p.requires_grad]
@@ -117,17 +104,13 @@ for epoch in range(1, num_epochs):
     model.train()
 
     i = 0
-    for batch_images, batch_annos in data_loader:
+    for idx, (batch_images, batch_targets) in enumerate(data_loader):
         i += 1
-        images = list(batch_images.to(device))
-        annos = list(batch_annos.to(device))
 
-
-        loss_dict = model(images, annos)
-    for batch_images, batch_targets in data_loader:
-        i += 1
-        images = list(batch_images.to(device))
-        targets = list(batch_targets.to(device))
+        images = list(img.to(device) for img in batch_images)
+        print(type(images), len(images))
+        targets = [{k: v.to(device) for k, v in t.items()} for t in batch_targets]
+        print(type(targets), len(targets))
 
 
         loss_dict = model(images, targets)

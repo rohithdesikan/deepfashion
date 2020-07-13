@@ -15,7 +15,47 @@ from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 # %%
+# Set the file paths
+curr_dir = os.getcwd()
+path_sample = os.path.abspath(os.path.join(curr_dir, os.pardir, 'data', 'sample_data'))
+path_raw = os.path.abspath(os.path.join(curr_dir, os.pardir, os.pardir, 'data', 'raw'))
 
+path_train = os.path.join(path_raw, 'train')
+path_val = os.path.join(path_raw, 'validation')
+path_train_images = os.path.join(path_train, 'image')
+path_train_annos = os.path.join(path_train, 'annos')
+path_val_images = os.path.join(path_val, 'image')
+path_val_annos = os.path.join(path_val, 'annos')
+path_sample_images = os.path.join(path_sample, 'image')
+path_sample_annos = os.path.join(path_sample, 'annos')
+
+train_image_list = os.listdir(path_train_images)
+train_annos_list = os.listdir(path_train_annos)
+
+image_list_small = path_sample_images[:100]
+annos_list_small = path_sample_annos[:100]
+
+image_list_eval = path_sample_images[101:130]
+annos_list_eval = path_sample_annos[101:130]
+
+file_ids = [i.split('.')[0] for i in image_list_small]
+path_train_targets = os.path.join(path_train, 'targets')
+path_val_images = os.path.join(path_val, 'image')
+path_val_targets = os.path.join(path_val, 'targets')
+path_sample_images = os.path.join(path_sample, 'image')
+path_sample_targets = os.path.join(path_sample, 'targets')
+
+image_list_sample = os.listdir(path_sample_images)
+targets_list_sample = os.listdir(path_sample_targets)
+
+image_list_train = image_list_sample[:100]
+targets_list_train = targets_list_sample[:100]
+
+image_list_eval = path_sample_images[101:130]
+targets_list_eval = path_sample_targets[101:130]
+
+file_ids_train = [i.split('.')[0] for i in image_list_train]
+file_ids_eval = [i.split('.')[0] for i in image_list_eval]
 
 # %%
 class CustomData(Dataset):
