@@ -65,7 +65,7 @@ class TransformData(Dataset):
         boxes = [None] * num_targets
 
         # Iterate through each annotation to find the # of labels and associated bounding boxes in the image
-        for j in range(1,num_targets+1):
+        for j in range(1, num_targets+1):
             
             # Obtain the image label
             label = data[f'item{j}']['category_id']
@@ -159,7 +159,7 @@ def load_model(fn):
     #     model.load_state_dict(torch.load(f))
 
     f = os.path.join(args.model_directory, f'{fn}.pt')
-    model.load_state_dict(torch.load(f))
+    model = torch.load_state_dict(torch.load(f))
     return model.to(device)
 
 

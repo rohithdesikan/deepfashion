@@ -93,5 +93,4 @@ target/
 .git
 
 # AWS Setup
-aws_setup.py
 awskeys.csv
