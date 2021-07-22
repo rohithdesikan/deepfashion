@@ -91,6 +91,8 @@ target/
 
 # .git
 .git
+.history
+.pytest_cache
 
 # AWS Setup
 awskeys.csv

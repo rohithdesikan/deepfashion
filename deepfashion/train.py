@@ -50,8 +50,8 @@ estimator = PyTorch(entry_point='model.py',
                     source_dir = os.getcwd(),
                     role=role,
                     framework_version='1.2.0',
-                    train_instance_count=1,
-                    train_instance_type='ml.p2.xlarge')
+                    train_instance_count=2,
+                    train_instance_type='ml.p2.8xlarge')
 
 # %%
 curr_time = datetime.datetime.now().strftime("%m-%d-%Y-%H-%M-%S")

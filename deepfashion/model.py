@@ -145,11 +145,13 @@ def _get_test_data_loader(resize):
 
     return test_loader
 
+
 # Save the model after training
 def save_model(model, fn):
     logger.info("Saving the latest model.")
     path = os.path.join(args.model_directory, f'{fn}.pt')
     torch.save(model.cpu().state_dict(), path)
+
 
 # Load a saved model for testing
 def load_model(fn):
@@ -235,6 +237,7 @@ def train(args):
     
     # return output
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -243,7 +246,7 @@ if __name__ == '__main__':
                         help='input batch size for training and testing (default: 10)')
     parser.add_argument('--resize', type=tuple, default=None, metavar='N',
                         help='Resize parameter. Default is (Height, Width) = (500, 400). Enter None for no resizing')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
+    parser.add_argument('--epochs', type=int, default=5, metavar='N',
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.001)')
